@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=148mm, initial-scale=1.0"/>
+  <title>CITY SUPPLIES</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    @page {
+      size: A5;
+      margin: 10mm;
+    }
+    body {
+      background-color: #f8f9fa;
+      font-size: 12px;
+    }
+    .invoice-box {
+      width: 100%;
+      padding: 10px;
+      background: #fff;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    .invoice-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #198754;
+      margin-top: 10px;
+    }
+    .logo {
+      width: 190px;
+      height: 190px;
+      object-fit: contain;
+    }
+    .small-font {
+      font-size: 10px !important;
+    }
+    #pageNumberInput {
+      width: 60px;
+      height: 30px;
+      font-size: 13px;
+      color: white;
+      background-color: red;
+      border: none;
+      border-radius: 4px;
+      padding-left: 6px;
+    }
+    .qty, .price {
+      width: 60px !important;
+      min-width: 0 !important;
+      max-width: 80px;
+      display: inline-block;
+      padding-right: 2px;
+      text-align: center;
+    }
+    .item-cell {
+      max-width: 340px;
+      min-width: 120px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .item-print, .item-print-value {
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      width: 100%;
+      max-width: 340px;
+      min-width: 120px;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .item-print-value {
+      display: none;
+    }
+    .date-discount-pagegroup {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+    .date-discount-pagegroup input[type="date"],
+    .date-discount-pagegroup input[type="text"],
+    .date-discount-pagegroup input[type="number"] {
+      flex: 1;
+    }
+    @media print {
+      input:not(#pageNumberInput),
+      button,
+      textarea,
+      select {
+        pointer-events: none;
+        user-select: none;
+        background-color: transparent !important;
+        border: none !important;
+        color: black !important;
+      }
+      #invoice-items input.item-print {
+        display: none !important;
+      }
+      #invoice-items .item-print-value {
+        display: block !important;
+        font-size: 11px;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        width: 100%;
+        max-width: 340px;
+        min-width: 120px;
+      }
+      #invoice-items input,
+      #invoice-items button {
+        pointer-events: auto !important;
+        user-select: auto !important;
+        background-color: #fff !important;
+        border: 1px solid #ddd !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      #pageNumberInput {
+        pointer-events: auto !important;
+        user-select: auto !important;
+      }
+      body {
+        -webkit-print-color-adjust: exact !important;
+      }
+      tr:nth-child(20n) {
+        page-break-after: always;
+      }
+    }
+    #auth-screen {
+      position: fixed;
+      z-index: 9999;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #auth-box {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px black;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="auth-screen">
+    <div id="auth-box">
+      <h4 class="mb-3">Enter Password</h4>
+      <input type="password" id="passwordInput" class="form-control mb-3" placeholder="Password">
+      <button onclick="checkPassword()" class="btn btn-success">Enter</button>
+      <p id="auth-error" class="text-danger mt-2" style="display:none;">Incorrect password!</p>
+    </div>
+  </div>
+
+  <div class="invoice-box" id="invoice" style="display:none;">
+    <div class="text-center mb-2">
+      <div class="d-flex align-items-center justify-content-center mb-1 gap-3">
+        <img src="CITY SUPPLIES LOGO.png" alt="Logo" class="logo me-2">
+        <p class="mb-0 align-self-center">
+          Tel: <strong>+252615994655</strong></p>
+      </div>
+    </div>
+
+    <div class="row mb-2">
+      <div class="col-6">
+        <input type="text" class="form-control form-control-sm" id="customerName" placeholder="Customer Name">
+      </div>
+      <div class="col-6">
+        <input type="text" class="form-control form-control-sm" id="customerPhone" placeholder="+25261XXXXXXX">
+      </div>
+    </div>
+
+    <div class="date-discount-pagegroup">
+      <input type="date" class="form-control form-control-sm" id="invoiceDate">
+      <input type="text" class="form-control form-control-sm" id="discount" placeholder="Discount (e.g. 10%)" oninput="validateDiscount(this)">
+      <input type="text" class="form-control form-control-sm" id="pageNumberInput" placeholder="Pg #">
+    </div>
+
+    <table class="table table-bordered table-sm mb-2">
+      <thead class="table-success">
+        <tr>
+          <th>#</th>
+          <th>Item</th>
+          <th>Qty</th>
+          <th>Price</th>
+          <th>Total</th>
+          <th class="no-print">Action</th>
+        </tr>
+      </thead>
+      <tbody id="invoice-items"></tbody>
+    </table>
+
+    <button class="btn btn-sm btn-primary no-print mb-2" onclick="addItem()">Add Item</button>
+
+    <div class="row mt-3 align-items-center">
+      <div class="col-4 text-start">
+        <h6 class="text-dark mb-0">TOTAL: $<span id="total">0.00</span></h6>
+      </div>
+      <div class="col-4 text-center">
+        <div class="mb-2">
+          <label class="form-label small mb-1">Paid:</label>
+          <input type="number" class="form-control form-control-sm" id="paidAmount" placeholder="0.00" oninput="calculateRest()">
+        </div>
+      </div>
+      <div class="col-4 text-center">
+        <div class="mb-2">
+          <label class="form-label small mb-1">Rest:</label>
+          <input type="number" class="form-control form-control-sm" id="restAmount" placeholder="0.00" readonly>
+        </div>
+      </div>
+    </div>
+
+    <div class="row mt-3">
+      <div class="col-6 text-center">
+        <div class="d-flex align-items-center justify-content-center">
+          <span class="me-2"><strong>Signature:</strong></span>
+          <input type="text" class="form-control form-control-sm" style="width: 150px; border: none; border-bottom: 2px solid #000; border-radius: 0; padding: 0; height: 30px;">
+        </div>
+      </div>
+      <div class="col-6 text-center no-print">
+        <button onclick="handlePrint()" class="btn btn-success btn-sm">Print</button>
+        <button onclick="downloadPDF()" class="btn btn-secondary btn-sm ms-2">Download PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script>
+    function checkPassword() {
+      const input = document.getElementById('passwordInput').value;
+      if (input === 'cs.1') {
+        document.getElementById('auth-screen').style.display = 'none';
+        document.getElementById('invoice').style.display = 'block';
+      } else {
+        document.getElementById('auth-error').style.display = 'block';
+      }
+    }
+
+    let lastEnteredPageNumber = 0;
+
+    function handlePageNumberInput(input) {
+      const currentValue = parseInt(input.value) || 0;
+      
+      if (currentValue > 0) {
+        if (currentValue !== lastEnteredPageNumber) {
+          input.value = currentValue + 1;
+          lastEnteredPageNumber = currentValue;
+        } else {
+          input.value = currentValue + 1;
+        }
+      }
+    }
+
+    function renumberItems() {
+      const rows = document.querySelectorAll('#invoice-items tr');
+      rows.forEach((row, idx) => {
+        row.querySelector('td').textContent = idx + 1;
+      });
+    }
+
+    function addItem() {
+      const tbody = document.getElementById('invoice-items');
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td></td>
+        <td class="item-cell">
+          <input type="text" class="form-control form-control-sm item-print" placeholder="Item name" oninput="this.nextElementSibling.textContent=this.value;this.nextElementSibling.title=this.value" title="">
+          <span class="item-print-value" style="display:none;" title=""></span>
+        </td>
+        <td><input type="number" class="form-control form-control-sm qty" value="1"></td>
+        <td><input type="number" class="form-control form-control-sm price" value="0"></td>
+        <td class="item-total">$0.00</td>
+        <td class="no-print"><button class="btn btn-danger btn-sm" onclick="removeItem(this)">Remove</button></td>
+      `;
+      tbody.appendChild(row);
+      renumberItems();
+      updateTotals();
+      row.querySelectorAll('.price, .qty').forEach(input => {
+        input.addEventListener('input', updateTotals);
+      });
+    }
+
+    function removeItem(btn) {
+      btn.closest('tr').remove();
+      renumberItems();
+      updateTotals();
+    }
+
+    function validateDiscount(input) {
+      const value = input.value.trim();
+      const valid = /^\d{1,2}%$/.test(value) || value === '';
+      input.classList.toggle('is-invalid', !valid);
+      updateTotals();
+    }
+
+    function updateTotals() {
+      let subtotal = 0;
+      document.querySelectorAll('#invoice-items tr').forEach(row => {
+        const price = parseFloat(row.querySelector('.price').value) || 0;
+        const qty = parseFloat(row.querySelector('.qty').value) || 0;
+        const rowTotal = price * qty;
+        row.querySelector('.item-total').textContent = '$' + rowTotal.toFixed(2);
+        subtotal += rowTotal;
+      });
+
+      const discountInput = document.getElementById('discount').value.trim();
+      let discountValue = 0;
+
+      if (/^\d{1,2}%$/.test(discountInput)) {
+        discountValue = (parseInt(discountInput) / 100) * subtotal;
+      }
+
+      const total = subtotal - discountValue;
+      document.getElementById('total').textContent = total.toFixed(2);
+      calculateRest();
+    }
+
+    function calculateRest() {
+      const total = parseFloat(document.getElementById('total').textContent) || 0;
+      const paid = parseFloat(document.getElementById('paidAmount').value) || 0;
+      const rest = total - paid;
+      document.getElementById('restAmount').value = rest.toFixed(2);
+    }
+
+    function downloadPDF() {
+      const element = document.querySelector(".invoice-box");
+      html2pdf().from(element).save("invoice.pdf");
+    }
+
+    function handlePrint() {
+      updateTotals();
+      const itemsCount = document.querySelectorAll('#invoice-items tr').length;
+      const invoiceBox = document.querySelector('.invoice-box');
+      invoiceBox.classList.remove('small-font');
+
+      if (itemsCount > 15 && itemsCount <= 20) {
+        invoiceBox.classList.add('small-font');
+      }
+
+      if (itemsCount <= 20) {
+        const style = document.createElement("style");
+        style.innerHTML = `
+          @media print {
+            body {
+              zoom: 1 !important;
+            }
+            @page {
+              size: A5;
+              margin: 10mm;
+            }
+            .invoice-box {
+              page-break-inside: avoid;
+            }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      window.print();
+    }
+
+    // Phone number auto-format
+    document.addEventListener('DOMContentLoaded', function() {
+      const phoneInput = document.getElementById('customerPhone');
+      if (phoneInput) {
+        phoneInput.addEventListener('input', function(e) {
+          let val = phoneInput.value.trim();
+          // Remove all spaces
+          val = val.replace(/\s+/g, '');
+          // If already starts with +252, do nothing
+          if (val.startsWith('+252')) return;
+          // If starts with 0, remove only the first 0
+          if (val.startsWith('0')) {
+            val = val.substring(1);
+          }
+          // If starts with 6, do nothing (handled below)
+          // Add +252 in front if not present
+          if (!val.startsWith('+252')) {
+            val = '+252' + val;
+          }
+          phoneInput.value = val;
+        });
+      }
+      // Discount auto-%
+      const discountInput = document.getElementById('discount');
+      if (discountInput) {
+        discountInput.addEventListener('input', function(e) {
+          let val = discountInput.value.trim();
+          // If only digits, add %
+          if (/^\d+$/.test(val)) {
+            discountInput.value = val + '%';
+          }
+          // If already ends with %, do nothing
+        });
+      }
+    });
+
+  </script>
+</body>
+</html>
